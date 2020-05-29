@@ -55,8 +55,8 @@ Calculate auto-cross covarainces with lag 10.
     acc_zscale.get(sequence, lag=10)
 Calculate physicochemical distance transformation with lag 100.
 
-    pdt_zscale = proDEC.Transform('PDT')
-    pdt_zscale.get(sequence, zscales, lag=100)
+    pdt_zscale = proDEC.Transform('PDT', zscales)
+    pdt_zscale.get(sequence, lag=100)
 
 ## Advanced usage
 ### Descriptors
@@ -112,14 +112,14 @@ Some transforms cannot be calculated for binary descriptors. Som others can only
 
  - ***PDT***
 
-By default physicochemical distance transformation is not set to return transformed values per dimension. One can do so using the following:
+By default physicochemical distance transformation is not set to return transformed values per dimension but their mean average. One can do so using the following:
 
     pdt_zscale = proDEC.Transform('PDT', zscales)
     pdt_zscale.get(sequence, average=False)
 
  - ***Transforms and advanced descriptor arguments***
 
-All descriptor arguments can be supplied to a transform's *get* method.
+All arguments a *Descriptor* accepts can be supplied to a transform's *get* method.
 
     pdt_zscale.get(sequence, lag=10, average=False, flatten=False)
     raych = pdescs.get('Raychaudhury')
@@ -128,7 +128,7 @@ All descriptor arguments can be supplied to a transform's *get* method.
 
 ### Adding new descriptors
 Supplied descriptors are described in the file named *data.json* under the *src* folder.
-The list of available descriptors is loaded for the *data.json* file when **ProteinDescriptors** is instanciated.
+The list of available descriptors is loaded from the *data.json* file when **ProteinDescriptors** is instanciated.
 Add your favorite descriptor to the list, respecting the format of the file and giving it a unique ID, for it to be available.
 
 ### Checking descriptor for amino acids support
