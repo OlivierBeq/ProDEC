@@ -4,9 +4,9 @@ A package to easily calculate descriptors of protein sequences and their common 
 
 ## Installation
 
-    > git clone
-    > https://gitlab.services.universiteitleiden.nl/cdd/prodec.git  cd 
-    > prodec/  pip install .
+    git clone https://gitlab.services.universiteitleiden.nl/cdd/prodec.git  
+    cd prodec/
+    pip install .
 
 ## Getting started
 
