@@ -17,7 +17,7 @@ def alpha_carbon_distance_edge_vector_speed(sequence: str,
                                             mapping: Callable[[str], Number],
                                             distance: Number = 1,
                                             power: Number = -4,
-                                            dtype: Type = np.float32,
+                                            dtype: Type = np.half,
                                             window: int = 60,
                                             offset: int = 1) -> List[Number]:
     """Calculate alphaCarbon distance-normalized edge vector.
@@ -55,7 +55,7 @@ def alpha_carbon_distance_edge_vector_memory(sequence: str,
                                              mapping: Callable[[str], Number],
                                              distance: Number = 1,
                                              power: Number = -4,
-                                             dtype: Type = np.float32,
+                                             dtype: Type = np.half,
                                              window: int = 60,
                                              offset: int = 1) -> List[Number]:
     """Calculate alphaCarbon distance-normalized edge vector.
@@ -74,7 +74,7 @@ def alpha_carbon_distance_edge_vector_memory(sequence: str,
     len_ = len(sequence)
     dists = np.zeros((len_, 1), dtype=dtype)
     for i in range(len_):
-        dists[i, 0] = np.power(i * distance + offset, power)
+        dists[i, 0] = np.power(dtype(i) * distance + offset, power)
     # Calculate indices
     values = np.zeros((len_, 1), dtype=dtype)
     for i in range(len_):
@@ -87,7 +87,7 @@ def alpha_carbon_distance_edge_vector_memory(sequence: str,
 def raychaudhury_speed(sequence: str,
                        mapping: Callable[[str], Number],
                        power: int,
-                       dtype: Type = np.float32) -> List[Number]:
+                       dtype: Type = np.half) -> List[Number]:
     """Calculate Raychaudhury's distance-normalized edge vector.
 
     This implementation is fast but requires a lot of memory.
@@ -115,7 +115,7 @@ def raychaudhury_speed(sequence: str,
 def raychaudhury_memory(sequence: str,
                         mapping: Callable[[str], Number],
                         power: int,
-                        dtype: Type = np.float32) -> List[Number]:
+                        dtype: Type = np.half) -> List[Number]:
     """Calculate Raychaudhury's distance-normalized edge vector.
 
     This implementation uses little memory but is slow.
@@ -128,8 +128,8 @@ def raychaudhury_memory(sequence: str,
     # Create distance edge vector
     len_ = len(sequence)
     dists = np.zeros((len_, 1), dtype=dtype)
-    for i in range(1, len_):
-        dists[i, 0] = np.power(i, power)
+    for i in range(len_):
+        dists[i, 0] = np.power(dtype(i + 1), power)
     # Calculate indices
     values = np.zeros((len_, 1), dtype=dtype)
     for i in range(len_):
@@ -152,24 +152,24 @@ def get_values(scale_values: dict):
     return values
 
 
-def enough_avail_memory(array_size: int, dtype: Type) -> bool:
+def enough_avail_memory(array_size: int, dtype: Type, margin: float=0.1) -> bool:
     """Check if enough memory is available.
 
     This is to use fast in memory computation of distance edge vectors.
     :param array_size : size of the sequence
+    :param dtype: uderlying data type of the array
+    :param margin: makes sure that the RAM available is at least (1 + margin)
+                   times the predicted RAM required to hold the array.
     """
-    def e(x): return 1 * x ** 2 + 112
     def f(x): return 2 * x ** 2 + 112
     def g(x): return 4 * x ** 2 + 112
     def h(x): return 8 * x ** 2 + 112
     avail_ram = virtual_memory().available
     obj_size = getsizeof(dtype(1))
-    if obj_size <= 25:
-        return e(array_size) * 1.5 < avail_ram
-    if obj_size == 26:
-        return f(array_size) * 1.5 < avail_ram
-    if obj_size == 28:
-        return g(array_size) * 1.5 < avail_ram
-    if obj_size >= 32:
-        return h(array_size) * 1.5 < avail_ram
+    if obj_size <= 26:
+        return f(array_size) * (1 + margin) < avail_ram
+    if obj_size <= 28:
+        return g(array_size) * (1 + margin) < avail_ram
+    else: # usually with obj_size >= 32:
+        return h(array_size) * (1 + margin) < avail_ram
     return False

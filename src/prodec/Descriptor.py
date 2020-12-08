@@ -2,6 +2,9 @@
 
 """Class handling amino acid description in a sequence."""
 
+import itertools
+import warnings
+
 import numpy as np
 
 from .utils import alpha_carbon_distance_edge_vector_memory, \
@@ -37,6 +40,7 @@ class Descriptor:
             self.Size = 1
         else:
             self.Size = 1
+        self.first_val_type = type(first_val)
         self.Binary = set(get_values(self.Scales_values)) == {0, 1}
 
     @property
@@ -59,16 +63,20 @@ class Descriptor:
                 return False
         return True
 
-    def get(self, sequence: str, flatten=True,
-            gaps=0, dictionary=std_amino_acids,
-            dtype=np.float64, prec=60, power=-4, **kwargs):
+    def get(self, sequence: str, flatten=True, gaps=0,
+            prec=60, power=-4, dtype=np.float16, fast=False,
+            **kwargs):
         """Get the raw values of the provided sequence.
 
-        :param sequence  : protein sequence
-        :param flatten   : not to return dimensions separate
-        :param gaps      : how should gaps be considered.
-        Allowed values: 'omit' or 0, ...+inf
-        :param dictionary: list of valid letters
+        :param sequence : protein sequence
+        :param flatten  : not to return dimensions separate
+        :param gaps     : how should gaps be considered.
+                          Allowed values: 'omit' or 0, ...+inf
+        :param dtype    : data type for memory efficiency
+        :param prec     : max number of amino acids to cosider 
+                          before and after the current Calpha
+        :param power    : power the topological distance is raised to
+        :param fast     : whether to speed up at the cost of intense memory use
         """
         # Dealing with gaps
         if gaps == 'omit':
@@ -79,7 +87,10 @@ class Descriptor:
                                 else '-' for x in sequence])
             replacer = gaps
             if self.Type == 'Linear':
-                self.Scales_values['-'] = [replacer] * self.Size
+                if self.first_val_type in [float, int]:
+                    self.Scales_values['-'] = replacer
+                else:
+                    self.Scales_values['-'] = [replacer] * self.Size
             elif self.Type == 'Distance':
                 self.Scales_values['-'] = {}
                 for key, value in self.Scales_values.items():
@@ -92,8 +103,8 @@ class Descriptor:
             raise Exception('Sequence has unsupported amino acid')
         # Create final array
         if self.Size > 1:
-            dtype = int if self.Binary else float
-            values = np.zeros((len(sequence), self.Size), dtype=dtype)
+            dtype_ = int if self.Binary else float
+            values = np.zeros((len(sequence), self.Size), dtype=dtype_)
             values.fill(replacer)
         elif self.Type == 'Distance':
             values = [replacer] * (len(sequence) - 1)
@@ -113,20 +124,27 @@ class Descriptor:
             if self.ID == 'Raychaudhury':
                 def mapping(x):
                     return self.Scales_values[x]
+                enough_ram = enough_avail_memory(len(sequence), dtype)
                 if not prec:
-                    if enough_avail_memory(len(sequence), dtype):
-                        return raychaudhury_speed(sequence, mapping,
-                                                  power, dtype)
-                    return raychaudhury_memory(sequence, mapping, power, dtype)
+                    if fast and enough_ram:
+                        values = raychaudhury_speed(sequence, mapping,
+                                                    power, dtype)
+                    else:
+                        if not enough_ram:
+                            warnings.warn('Not enough memory available, reverting to slow calculation.')
+                        values = raychaudhury_memory(sequence, mapping, power, dtype)
                 else:
-                    if enough_avail_memory(len(sequence), dtype):
-                        return alpha_carbon_distance_edge_vector_speed(
+                    if fast and enough_ram:
+                        values = alpha_carbon_distance_edge_vector_speed(
                                                                  sequence,
                                                                  mapping,
                                                                  1, power,
                                                                  dtype,
                                                                  prec, 1)
-                    return alpha_carbon_distance_edge_vector_memory(sequence,
+                    else:
+                        if not enough_ram:
+                            warnings.warn('Not enough memory available, reverting to slow calculation.')
+                        values = alpha_carbon_distance_edge_vector_memory(sequence,
                                                                     mapping,
                                                                     1, power,
                                                                     dtype,
