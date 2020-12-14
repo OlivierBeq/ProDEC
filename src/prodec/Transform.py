@@ -215,6 +215,7 @@ class Transform(Descriptor):
 
 
     def pandas_get(self, sequences: List[str],
+                   ids: Optional[List[str]]=None,
                    lag: int = 1,
                    domains: int = 2,
                    average: bool = True,
@@ -243,8 +244,11 @@ class Transform(Descriptor):
             raise ValueError(f'Lag ({lag}) has to be greater or equal to 1 and '
                               'lower than the length of the smallest sequence '
                               f'({min(map(len, sequences))})')
-        values = pd.DataFrame(_multiprocess_get(self, sequences, nproc, ipynb, quiet,
+        values = pd.DataFrame(_multiprocess_get(self, sequences=sequences, ids=ids, nproc=nproc, ipynb=ipynb, quiet=quiet,
                                                 lag=lag, domains=domains, average=average))
         info = f'domains{domains}' if self.Type == "AVG" else f'lag{lag}'
-        values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
+        if ids:
+            values.columns = ['ID'] + [f'{self.Type}_{info}_{self.Descriptor.ID.split()[0]}_{x}' for x in range(1, len(values.columns))]
+        else:
+            values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
         return values

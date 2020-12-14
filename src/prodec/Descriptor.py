@@ -161,6 +161,7 @@ class Descriptor:
             return values.flatten(order='C').tolist()
 
     def pandas_get(self, sequences: List[str],
+                   ids: Optional[List[str]]=None,
                    gaps: Union[int, str]=0,
                    prec: Optional[int]=60,
                    power: int=-4,
@@ -183,10 +184,13 @@ class Descriptor:
         :param quiet    : whether to report progress
         :param ipynb    : whether the function is run from a notebook
         """
-        values = pd.DataFrame(_multiprocess_get(self, sequences, nproc, ipynb, quiet,
+        values = pd.DataFrame(_multiprocess_get(self, sequences=sequences, ids=ids, nproc=nproc, ipynb=ipynb, quiet=quiet,
                                                 gaps=gaps, prec=prec, power=power,
                                                 fast=fast, dtype=dtype))
-        values.columns = [f'{self.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
+        if ids:
+            values.columns = ['ID'] + [f'{self.ID.split()[0]}_{x}' for x in range(1, len(values.columns))]
+        else:
+            values.columns = [f'{self.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
         return values
 
                 

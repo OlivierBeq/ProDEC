@@ -8,7 +8,7 @@ from collections import deque
 from itertools import islice
 from numbers import Number
 from multiprocessing import cpu_count, Manager, Pool
-from typing import Callable, List, Type, Union
+from typing import Callable, List, Optional, Type, Union
 
 import numpy as np
 from psutil import virtual_memory
@@ -204,12 +204,13 @@ class DescriptorPool:
         self.pool.terminate()
         self.mgr.__exit__(*args, **kwargs)
 
-    def map(self, seqs):
+    def map(self, seqs, ids):
         """Distribute calculation for sequences to a PoolIterator.
         
         :param seqs: protein sequences
+        :pram ids: identifiers of protein sequences
         """
-        return PoolIterator(self, seqs, self.nproc * 2 + 10)
+        return PoolIterator(self, seqs, ids, self.nproc * 2 + 10)
 
     def submit(self, seq):
         """Submit calculation to the internal Pool.
@@ -221,7 +222,7 @@ class DescriptorPool:
 
 class PoolIterator:
     """Multiprocessing iterator to be used with DescriptorPool"""
-    def __init__(self, pool: DescriptorPool, seqs: List[str], buf: int):
+    def __init__(self, pool: DescriptorPool, seqs: List[str], ids:List[str], buf: int):
         """Instantiate a PoolIterator.
         
         :param pool: the DescriptorPool to submit calculations to
@@ -230,7 +231,7 @@ class PoolIterator:
         """
         self.pool = pool
         self.futures = deque()
-        self.seqs = zip(range(len(seqs)), seqs)
+        self.seqs = zip(ids, seqs)
 
         for id, seq in islice(self.seqs, buf):
             self.submit(id, seq)
@@ -266,6 +267,7 @@ class PoolIterator:
 
 def _multiprocess_get(descriptor,  # a Descriptor or Transform object
                       sequences: List[str],
+                      ids: Optional[List[str]]=None,
                       nproc: int=1,
                       ipynb: bool=False,
                       quiet:bool=False, **kwargs):
@@ -273,10 +275,16 @@ def _multiprocess_get(descriptor,  # a Descriptor or Transform object
     
     :param descriptor: prodec.Descriptor or prodec.Transform
     :param sequences: protein sequences
+    :param ids: identifiers of protein sequences
     :param nproc: number of concurrent processes
     :param ipynb: whether it is used in a notebook
     :param quiet: whether to show progress or not
     """
+    ids_given = ids is not None
+    if not ids_given:
+        ids = list(map(str, range(len(sequences))))
+    elif len(ids) != len(sequences):
+        raise ValueError('sequences and ids must have same length.')
     if not isinstance(nproc, int) or nproc < 1:
         nproc = cpu_count()
     if ipynb:
@@ -285,9 +293,16 @@ def _multiprocess_get(descriptor,  # a Descriptor or Transform object
     else:
         import tqdm
         pbar = tqdm.tqdm(total=len(sequences), disable=quiet)
-    with DescriptorPool(descriptor, nproc, **kwargs) as pool:
-        for seq, res in pool.map(sequences):
-            yield res
-            if not quiet:
-                pbar.update()
-    pbar.close()
+    try:
+        with DescriptorPool(descriptor, nproc, **kwargs) as pool:
+            for seq, res in pool.map(sequences, ids):
+                if ids_given:
+                    yield [seq] + res
+                else:
+                    yield res
+                if not quiet:
+                    pbar.update()
+    except Exception as _:
+        pbar.close()
+    else:
+        pbar.close()
