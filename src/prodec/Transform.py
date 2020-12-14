@@ -60,14 +60,13 @@ class Transform(Descriptor):
                                      TRANSFORMS[type]['Binary'] == 'All')
 
     def get(self, sequence: str, flatten: bool = True, lag: int = 1,
-            domains: int = 2, average: bool = True, **kwargs):
+            domains: int = 2, **kwargs):
         """Transform raw protein descriptor values.
 
         :param sequence : protein sequence
         :param flatten  : not to return dimensions separate, only for AVG and ACC
         :param lag      : lag value
         :param domains  : number of averaged domains
-        :param average  : global average of dimensions, only for PDT
         """
         if not Transform.is_compatible(self.Type, self.Descriptor):
             raise Exception(f'Type of transform ({self.Type}) is incompatible'
@@ -79,7 +78,7 @@ class Transform(Descriptor):
                                                 **kwargs)
         elif self.Type == 'PDT':
             return self.__physicochem_distance_tansform__(sequence, lag,
-                                                          average, **kwargs)
+                                                          **kwargs)
         else:
             raise NotImplementedError(f'Transform type {self.Type} '
                                       'is not implemented')
@@ -128,11 +127,13 @@ class Transform(Descriptor):
                           * domains
                 average = np.append(average, np.average(average[:domains *
                                     self.Descriptor.Size], weights=weights))
-            average = np.reshape(average, (domains+1, shape[1])).tolist()
+            average = np.reshape(np.round(average, 6), (domains+1, shape[1])).tolist()
+            # Add global mean average
+            average.append(np.round(np.average(average), 6))
         else:
             # Add global mean average
             average = np.append(np.round(average, 6),
-                                np.average(np.round(average, 6))).tolist()
+                                np.round(np.average(average), 6)).tolist()
         return average
 
     def __autocrosscovariance__(self, sequence: str, lag: int,
@@ -164,19 +165,18 @@ class Transform(Descriptor):
                     acc[m, j] += ((raw[i*self.Descriptor.Size+j] *
                                    raw[(i+lag)*self.Descriptor.Size+m]) /
                                   (length-lag))
+        acc = np.round(acc, 6)
         if flatten:
             return acc.flatten(order='F').tolist()
         return acc.tolist()
 
 
-    def __physicochem_distance_tansform__(self, sequence: str, lag: int, 
-                                          gaps: Union[int, str]='omit', **kwargs):
+    def __physicochem_distance_tansform__(self, sequence: str, lag: int, **kwargs):
         """Calculate physicochemical distance transform values.
 
+        Gaps will automatically be omitted.
         :param sequence : protein sequence
         :param lag: lag between amino acids
-        :param gaps: how should gaps be considered.
-                     Allowed values: 'omit' or 0, ...+inf
         """
         length = (len(sequence) - 1
                   if self.Descriptor.Type == 'Distance'
@@ -199,9 +199,8 @@ class Transform(Descriptor):
         # Adjust raw values
         raw = np.array(self.Descriptor.get(sequence, flatten=False, **kwargs))
         raw = (raw - mean_score) / mean_difference
-        # Taking gaps into account
-        if ('gaps', 'omit') in kwargs.items():
-            sequence = ''.join(filter(str.isalpha, sequence))
+        # Removing gaps
+        sequence = ''.join(filter(str.isalpha, sequence))
         # Get PDT
         pdt = np.zeros(self.Descriptor.Size)
         for i in range(length - lag):
@@ -211,6 +210,7 @@ class Transform(Descriptor):
                 for m in range(self.Descriptor.Size):
                     pdt[m] += math.pow(raw[i, m] - raw[i+lag, m], 2)
         pdt /= length - lag
+        pdt = np.round(pdt, 6)
         return pdt.tolist()
 
 
