@@ -2,9 +2,13 @@
 
 """Utility functions for ProDEC."""
 
+import functools
+import sys
+from collections import deque
+from itertools import islice
 from numbers import Number
-from sys import getsizeof
-from typing import Callable, List, Type
+from multiprocessing import cpu_count, Manager, Pool
+from typing import Callable, List, Type, Union
 
 import numpy as np
 from psutil import virtual_memory
@@ -165,7 +169,7 @@ def enough_avail_memory(array_size: int, dtype: Type, margin: float=0.1) -> bool
     def g(x): return 4 * x ** 2 + 112
     def h(x): return 8 * x ** 2 + 112
     avail_ram = virtual_memory().available
-    obj_size = getsizeof(dtype(1))
+    obj_size = sys.getsizeof(dtype(1))
     if obj_size <= 26:
         return f(array_size) * (1 + margin) < avail_ram
     if obj_size <= 28:
@@ -173,3 +177,117 @@ def enough_avail_memory(array_size: int, dtype: Type, margin: float=0.1) -> bool
     else: # usually with obj_size >= 32:
         return h(array_size) * (1 + margin) < avail_ram
     return False
+
+
+class DescriptorPool:
+    """Multiprofcessing class to calculate descriptors and transforms."""
+    def __init__(self, calc,
+                 nproc: int, **kwargs):
+        """Instantiate a DescriptorPool.
+        
+        :param calc: a prodec.Descriptor or prodec.Transform object
+        :param nproc: number of concurrent processes
+        :param kwargs: any prodec.Descriptor or prodec.Transform parameter
+        """
+        self.pool = Pool(nproc)
+        self.mgr = Manager()
+        self.calc = functools.partial(calc.get, **kwargs)
+        self.nproc = nproc
+
+    def __enter__(self):
+        """Start iteration."""
+        self.mgr.__enter__()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        """Terminate iteration."""
+        self.pool.terminate()
+        self.mgr.__exit__(*args, **kwargs)
+
+    def map(self, seqs):
+        """Distribute calculation for sequences to a PoolIterator.
+        
+        :param seqs: protein sequences
+        """
+        return PoolIterator(self, seqs, self.nproc * 2 + 10)
+
+    def submit(self, seq):
+        """Submit calculation to the internal Pool.
+
+        :param seq: protein sequence
+        """
+        return self.pool.apply_async(self.calc, (seq,))
+
+
+class PoolIterator:
+    """Multiprocessing iterator to be used with DescriptorPool"""
+    def __init__(self, pool: DescriptorPool, seqs: List[str], buf: int):
+        """Instantiate a PoolIterator.
+        
+        :param pool: the DescriptorPool to submit calculations to
+        :param seqs: list of protein sequences
+        :param buf: buffer of sequences per process
+        """
+        self.pool = pool
+        self.futures = deque()
+        self.seqs = zip(range(len(seqs)), seqs)
+
+        for id, seq in islice(self.seqs, buf):
+            self.submit(id, seq)
+
+    def submit(self, id, seq):
+        """Add sequence id and future to internal futures.
+        
+        :param id: ID of the sequence
+        :param seq: protein sequence
+        """
+        self.futures.append((id, self.pool.submit(seq)))
+
+    def __iter__(self):
+        """Iterate to create a container."""
+        return self
+
+    def __next__(self):
+        """Submit job and return."""
+        try:
+            id, seq = next(self.seqs)
+            self.submit(id, seq)
+        except StopIteration:
+            pass
+
+        try:
+            id, fut = self.futures.popleft()
+            return id, fut.get()
+        except IndexError:
+            raise StopIteration
+
+    next = __next__
+
+
+def _multiprocess_get(descriptor,  # a Descriptor or Transform object
+                      sequences: List[str],
+                      nproc: int=1,
+                      ipynb: bool=False,
+                      quiet:bool=False, **kwargs):
+    """Calculate protein descriptors or transforms and return a pandas dataframe.
+    
+    :param descriptor: prodec.Descriptor or prodec.Transform
+    :param sequences: protein sequences
+    :param nproc: number of concurrent processes
+    :param ipynb: whether it is used in a notebook
+    :param quiet: whether to show progress or not
+    """
+    if not isinstance(nproc, int) or nproc < 1:
+        nproc = cpu_count()
+    if ipynb:
+        import tqdm.notebook
+        pbar = tqdm.notebook.tqdm(total=len(sequences), disable=quiet)
+    else:
+        import tqdm
+        pbar = tqdm.tqdm(total=len(sequences), disable=quiet)
+    with DescriptorPool(descriptor, nproc, **kwargs) as pool:
+        for seq, res in pool.map(sequences):
+            yield res
+            if not quiet:
+                pbar.update()
+    pbar.close()

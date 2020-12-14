@@ -3,10 +3,13 @@
 """Class handling transformation of descriptor raw values."""
 
 import math
+from typing import List, Optional, Union
 
 import numpy as np
+import pandas as pd
 
 from .Descriptor import Descriptor
+from .utils import _multiprocess_get
 
 TRANSFORMS = {'AVG': {'Fullname': 'Domain average',
                       'Constant Length': True, 'Binary': False},
@@ -47,7 +50,7 @@ class Transform(Descriptor):
     def is_compatible(type: str, descriptor: Descriptor) -> bool:
         """Say if types of tranform and descriptor are compatible.
 
-        :param transform_type: Type of transform
+        :param type: Type of transform
         :param descriptor: Descriptor to be transformed
         """
         if type not in TRANSFORMS.keys():
@@ -56,13 +59,12 @@ class Transform(Descriptor):
         return descriptor.Binary == (TRANSFORMS[type]['Binary'] or
                                      TRANSFORMS[type]['Binary'] == 'All')
 
-    def get(self, sequence: str, flatten: bool = True, lag: int = 0,
-            domains: int = 0, average: bool = True, **kwargs):
+    def get(self, sequence: str, flatten: bool = True, lag: int = 1,
+            domains: int = 2, average: bool = True, **kwargs):
         """Transform raw protein descriptor values.
 
-        :param sequence : raw descriptor values
-        :param flatten  : not to return dimensions separate,
-        only for AVG and ACC
+        :param sequence : protein sequence
+        :param flatten  : not to return dimensions separate, only for AVG and ACC
         :param lag      : lag value
         :param domains  : number of averaged domains
         :param average  : global average of dimensions, only for PDT
@@ -86,12 +88,13 @@ class Transform(Descriptor):
                     flatten: bool, **kwargs):
         """Calculate domain mean average values.
 
-        :param domains: Number of domains to split the sequence into
-        :param flatten: Whether to give global average
+        :param sequence : protein sequence
+        :param domains: number of domains to split the sequence into
+        :param flatten: whether to give global average
                         or average per dimension.
         """
         length = len(sequence)
-        if domains < 2 or domains >= length:
+        if domains < 1 or domains > length:
             raise Exception(f'Number of domains ({domains}) '
                             'has to be greater or equal to 1 '
                             ' and lower or equal than the length '
@@ -136,6 +139,7 @@ class Transform(Descriptor):
                                 flatten: bool, **kwargs):
         """Calculate auto-cross covariances values.
 
+        :param sequence : protein sequence
         :param lag: Lag between amino acids
         :param flatten: Whether to give global average or average per dimension
         """
@@ -161,16 +165,18 @@ class Transform(Descriptor):
                                    raw[(i+lag)*self.Descriptor.Size+m]) /
                                   (length-lag))
         if flatten:
-            return acc.flatten(order='F')
-        return acc
+            return acc.flatten(order='F').tolist()
+        return acc.tolist()
 
-    def __physicochem_distance_tansform__(self, sequence: str, lag: int,
-                                          average: bool, **kwargs):
+
+    def __physicochem_distance_tansform__(self, sequence: str, lag: int, 
+                                          gaps: Union[int, str]='omit', **kwargs):
         """Calculate physicochemical distance transform values.
 
-        :param domains: Number of domains to split the sequence into
-        :param flatten: True to give global average,
-                        else average per dimension.
+        :param sequence : protein sequence
+        :param lag: lag between amino acids
+        :param gaps: how should gaps be considered.
+                     Allowed values: 'omit' or 0, ...+inf
         """
         length = (len(sequence) - 1
                   if self.Descriptor.Type == 'Distance'
@@ -205,6 +211,40 @@ class Transform(Descriptor):
                 for m in range(self.Descriptor.Size):
                     pdt[m] += math.pow(raw[i, m] - raw[i+lag, m], 2)
         pdt /= length - lag
-        if average:
-            return np.average(pdt)
-        return pdt
+        return pdt.tolist()
+
+
+    def pandas_get(self, sequences: List[str],
+                   lag: int = 1,
+                   domains: int = 2,
+                   average: bool = True,
+                   nproc: Optional[int]=None,
+                   quiet=False,
+                   ipynb=False, **kwargs) -> pd.DataFrame:
+        """Get the raw values of the provided sequences in a pandas DataFrame.
+
+        :param sequences: protein sequences
+        :param gaps     : how should gaps be considered.
+                          Allowed values: 'omit' or 0, ...+inf
+        :param prec     : max number of amino acids to cosider 
+                          before and after the current Calpha
+        :param power    : power the topological distance is raised to
+        :param dtype    : data type for memory efficiency
+        :param fast     : whether to speed up at the cost of intense memory use
+        :param nproc    : number of concurrent processes to run
+        :param quiet    : whether to report progress
+        :param ipynb    : whether the function is run from a notebook
+        """
+        if domains > min(map(len, sequences)) or domains < 1:
+            raise ValueError(f'Number of domains ({domains}) has to be greater or equal to 1'
+                            ' and lower or equal than the length of the smallest sequence '
+                            f'({min(map(len, sequences))})')
+        if lag >= min(map(len, sequences)) or lag < 1:
+            raise ValueError(f'Lag ({lag}) has to be greater or equal to 1 and '
+                              'lower than the length of the smallest sequence '
+                              f'({min(map(len, sequences))})')
+        values = pd.DataFrame(_multiprocess_get(self, sequences, nproc, ipynb, quiet,
+                                                lag=lag, domains=domains, average=average))
+        info = f'domains{domains}' if self.Type == "AVG" else f'lag{lag}'
+        values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
+        return values

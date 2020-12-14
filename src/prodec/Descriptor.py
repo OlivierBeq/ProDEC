@@ -3,15 +3,19 @@
 """Class handling amino acid description in a sequence."""
 
 import itertools
+import multiprocessing
 import warnings
+from typing import Callable, List, Optional, Type, Union
+
 
 import numpy as np
+import pandas as pd
 
 from .utils import alpha_carbon_distance_edge_vector_memory, \
                    alpha_carbon_distance_edge_vector_speed, \
                    enough_avail_memory, get_values, \
                    raychaudhury_memory, raychaudhury_speed, \
-                   std_amino_acids
+                   _multiprocess_get
 
 
 class Descriptor:
@@ -25,15 +29,15 @@ class Descriptor:
         self.ID = desc_data['ID']
         self.Type = desc_data['Type']
         self.Name = desc_data['Name']
-        self.Scales_names = desc_data['Scales']['Names']
-        self.Scales_values = desc_data['Scales']['Values']
+        self._scales_names = desc_data['Scales']['Names']
+        self._scales_values = desc_data['Scales']['Values']
         self.Info = {'Authors': desc_data['Authors'],
                      'Year': desc_data['Year'],
                      'Journal': desc_data['Journal'],
                      'DOI': desc_data['DOI'],
                      'PMID': desc_data['PMID'],
                      'Patent': desc_data['Patent']}
-        first_val = list(self.Scales_values.values())[0]
+        first_val = list(self._scales_values.values())[0]
         if isinstance(first_val, list):
             self.Size = len(first_val)
         elif isinstance(first_val, dict):
@@ -41,7 +45,7 @@ class Descriptor:
         else:
             self.Size = 1
         self.first_val_type = type(first_val)
-        self.Binary = set(get_values(self.Scales_values)) == {0, 1}
+        self.Binary = set(get_values(self._scales_values)) == {0, 1}
 
     @property
     def summary(self):
@@ -51,7 +55,7 @@ class Descriptor:
     @property
     def definition(self):
         """Get values defining the descriptor."""
-        return self.Scales_values
+        return self._scales_names, self._scales_values
 
     def is_sequence_valid(self, sequence: str):
         """Check if a sequence can be fully described using the current descriptor.
@@ -59,12 +63,12 @@ class Descriptor:
         :param sequence: Protein sequence
         """
         for letter in sequence:
-            if letter not in self.Scales_values.keys():
+            if letter not in self._scales_values.keys():
                 return False
         return True
 
-    def get(self, sequence: str, flatten=True, gaps=0,
-            prec=60, power=-4, dtype=np.float16, fast=False,
+    def get(self, sequence: str, flatten: bool=True, gaps: Union[int, str]=0,
+            prec: Optional[int]=60, power: int=-4, dtype: Type=np.float16, fast: bool=False,
             **kwargs):
         """Get the raw values of the provided sequence.
 
@@ -88,16 +92,16 @@ class Descriptor:
             replacer = gaps
             if self.Type == 'Linear':
                 if self.first_val_type in [float, int]:
-                    self.Scales_values['-'] = replacer
+                    self._scales_values['-'] = replacer
                 else:
-                    self.Scales_values['-'] = [replacer] * self.Size
+                    self._scales_values['-'] = [replacer] * self.Size
             elif self.Type == 'Distance':
-                self.Scales_values['-'] = {}
-                for key, value in self.Scales_values.items():
-                    self.Scales_values[key]['-'] = value
-                    self.Scales_values['-'][key] = value
+                self._scales_values['-'] = {}
+                for key, value in self._scales_values.items():
+                    self._scales_values[key]['-'] = value
+                    self._scales_values['-'][key] = value
             else:
-                self.Scales_values['-'] = replacer
+                self._scales_values['-'] = replacer
         # Checking sequence
         if not self.is_sequence_valid(sequence):
             raise Exception('Sequence has unsupported amino acid')
@@ -114,16 +118,16 @@ class Descriptor:
             for i in range(len(sequence)):
                 if self.Size > 1:
                     for j in range(self.Size):
-                        values[i, j] = self.Scales_values[sequence[i]][j]
+                        values[i, j] = self._scales_values[sequence[i]][j]
                 else:
-                    values[i] = self.Scales_values[sequence[i]]
+                    values[i] = self._scales_values[sequence[i]]
         elif self.Type == 'Distance':
             for i in range(len(sequence) - 1):
-                values[i] = self.Scales_values[sequence[i]][sequence[i+1]]
+                values[i] = self._scales_values[sequence[i]][sequence[i+1]]
         else:
             if self.ID == 'Raychaudhury':
                 def mapping(x):
-                    return self.Scales_values[x]
+                    return self._scales_values[x]
                 enough_ram = enough_avail_memory(len(sequence), dtype)
                 if not prec:
                     if fast and enough_ram:
@@ -155,3 +159,34 @@ class Descriptor:
             return values.tolist()
         else:
             return values.flatten(order='C').tolist()
+
+    def pandas_get(self, sequences: List[str],
+                   gaps: Union[int, str]=0,
+                   prec: Optional[int]=60,
+                   power: int=-4,
+                   dtype: Type=np.float16,
+                   fast: bool=False,
+                   nproc: Optional[int]=None,
+                   quiet=False,
+                   ipynb=False, **kwargs) -> pd.DataFrame:
+        """Get the raw values of the provided sequences in a pandas DataFrame.
+
+        :param sequences: protein sequences
+        :param gaps     : how should gaps be considered.
+                          Allowed values: 'omit' or 0, ...+inf
+        :param prec     : max number of amino acids to cosider 
+                          before and after the current Calpha
+        :param power    : power the topological distance is raised to
+        :param dtype    : data type for memory efficiency
+        :param fast     : whether to speed up at the cost of intense memory use
+        :param nproc    : number of concurrent processes to run
+        :param quiet    : whether to report progress
+        :param ipynb    : whether the function is run from a notebook
+        """
+        values = pd.DataFrame(_multiprocess_get(self, sequences, nproc, ipynb, quiet,
+                                                gaps=gaps, prec=prec, power=power,
+                                                fast=fast, dtype=dtype))
+        values.columns = [f'{self.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
+        return values
+
+                
