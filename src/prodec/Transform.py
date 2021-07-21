@@ -248,7 +248,7 @@ class Transform(Descriptor):
                                                 lag=lag, domains=domains, average=average))
         info = f'domains{domains}' if self.Type == "AVG" else f'lag{lag}'
         if ids:
-            values.columns = ['ID'] + [f'{self.Type}_{info}_{self.Descriptor.ID.split()[0]}_{x}' for x in range(1, len(values.columns))]
+            values.columns = ['ID'] + [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in range(1, len(values.columns))]
         else:
-            values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
+            values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in range(1, len(values.columns) + 1)]
         return values
