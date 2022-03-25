@@ -3,6 +3,7 @@
 """Class handling transformation of descriptor raw values."""
 
 import math
+from enum import Enum, unique
 from typing import List, Optional, Union
 
 import numpy as np
@@ -11,86 +12,121 @@ import pandas as pd
 from .Descriptor import Descriptor
 from .utils import _multiprocess_get
 
-TRANSFORMS = {'AVG': {'Fullname': 'Domain average',
-                      'Constant Length': True, 'Binary': False},
-              'ACC': {'Fullname': 'Auto-cross covariances',
-                      'Constant Length': True, 'Binary': False},
-              'PDT': {'Fullname': 'Physicochemical Distance Tranformation',
-                      'Constant Length': True, 'Binary': False}}
+
+@unique
+class TransformType(Enum):
+    """Types of transforms one can apply to descriptors."""
+    AVG = 0
+    ACC = 1
+    PDT = 2
+
+    def __repr__(self):
+        """Create the transform type representation."""
+        return f'<{self.__class__.__name__}.{self.name}>'
+
+    @property
+    def data(self):
+        transforms = [{'Fullname': 'Domain average', 'Constant Length': True, 'Binary': False},
+                      {'Fullname': 'Auto-cross covariances', 'Constant Length': True, 'Binary': False},
+                      {'Fullname': 'Physicochemical Distance Tranformation', 'Constant Length': True, 'Binary': False},
+                      ]
+        return transforms[self.value]
+
+    @property
+    def fullname(self):
+        return self.data[self.value]['Fullname']
+
+    @property
+    def constant_length(self):
+        return self.data[self.value]['Constant Length']
+
+    @property
+    def binary(self):
+        return self.data[self.value]['Binary']
+
+    @classmethod
+    def available(cls):
+        return list(cls.__members__.values())
 
 
-class Transform(Descriptor):
+class Transform:
     """A class used to process raw values of protein descriptors."""
 
-    def __init__(self, type: str, descriptor: Descriptor):
-        """Instanciate a Transform.
+    def __init__(self, type: Union[str, TransformType], descriptor: Descriptor):
+        """Instantiate a Transform.
 
         :param type: Type of Transform
         :param descriptor: Descriptor to be transformed
         """
-        if type not in TRANSFORMS.keys():
-            raise Exception(f'Transform type {type} can only be '
-                            f'of the following values '
-                            f'{list(TRANSFORMS.keys())}')
-        self.Type = type
+        if not isinstance(type, (str, TransformType)):
+            raise ValueError('transform type must be either a str or a TransformType')
+        if isinstance(type, str):
+            if type not in TransformType.available():
+                raise ValueError('transform type is not supported')
+            self.Type = TransformType[type]
+        else:
+            self.Type = type
         self.Descriptor = descriptor
-        self.Binary = TRANSFORMS[type]['Binary']
+        self.Binary = self.Type.binary
 
     @staticmethod
     def available_transforms():
         """Get possible transforms for all descriptors."""
-        return list(TRANSFORMS.keys())
+        return [x.data for x in TransformType.available()]
 
     @property
     def summary(self):
         """Get information on current transform."""
-        return TRANSFORMS[self.Type]
+        return self.Type.data
 
     @staticmethod
-    def is_compatible(type: str, descriptor: Descriptor) -> bool:
-        """Say if types of tranform and descriptor are compatible.
+    def is_compatible(transform: Union[str, TransformType], descriptor: Descriptor) -> bool:
+        """Say if types of transforms and descriptors are compatible.
 
-        :param type: Type of transform
+        :param transform: Type of transform
         :param descriptor: Descriptor to be transformed
         """
-        if type not in TRANSFORMS.keys():
-            raise NotImplementedError(f'Transform type {type}'
-                                      ' is not implemented')
-        return descriptor.Binary == (TRANSFORMS[type]['Binary'] or
-                                     TRANSFORMS[type]['Binary'] == 'All')
+        if not isinstance(transform, (str, TransformType)):
+            raise ValueError('transform must be either a str or a TransformType')
+        if transform not in TransformType.available():
+            raise ValueError(f'Transform type {transform} is not implemented')
+        if isinstance(transform, str):
+            return descriptor.Binary == TransformType[transform]['Binary'] or TransformType[transform][
+                'Binary'] == 'All'
+        return descriptor.Binary == transform.data['Binary'] or transform.data['Binary'] == 'All'
 
     def get(self, sequence: str, flatten: bool = True, lag: int = 1,
             domains: int = 2, **kwargs):
         """Transform raw protein descriptor values.
 
-        :param sequence : protein sequence
-        :param flatten  : not to return dimensions separate, only for AVG and ACC
-        :param lag      : lag value
-        :param domains  : number of averaged domains
+        :param sequence : Protein sequence
+        :param flatten  : Should dimensions not be returned separately (only for AVG and ACC)
+        :param lag      : Lag between amino acids (only for ACC and PDT)
+        :param domains  : Number of domains to split the sequence into (only for AVG)
+        :param kwargs: keyword arguments passed to the get method of the underlying descriptor
         """
         if not Transform.is_compatible(self.Type, self.Descriptor):
             raise Exception(f'Type of transform ({self.Type}) is incompatible'
                             f' with descriptor type ({self.Descriptor.Type})')
-        if self.Type == 'AVG':
+        if self.Type is TransformType.AVG:
             return self.__average__(sequence, domains, flatten, **kwargs)
-        elif self.Type == 'ACC':
+        elif self.Type is TransformType.ACC:
             return self.__autocrosscovariance__(sequence, lag, flatten,
                                                 **kwargs)
-        elif self.Type == 'PDT':
-            return self.__physicochem_distance_tansform__(sequence, lag,
-                                                          **kwargs)
+        elif self.Type is TransformType.PDT:
+            return self.__physicochem_distance_transform__(sequence, lag,
+                                                           **kwargs)
         else:
-            raise NotImplementedError(f'Transform type {self.Type} '
-                                      'is not implemented')
+            raise NotImplementedError(f'Transform type {self.Type} is not implemented')
 
     def __average__(self, sequence: str, domains: int,
                     flatten: bool, **kwargs):
         """Calculate domain mean average values.
 
-        :param sequence : protein sequence
-        :param domains: number of domains to split the sequence into
-        :param flatten: whether to give global average
-                        or average per dimension.
+        :param sequence : Protein sequence
+        :param domains: Number of domains to split the sequence into
+        :param flatten: Should dimensions not be returned separately
+        :param kwargs: keyword arguments passed to the get method of the underlying descriptor
         """
         length = len(sequence)
         if domains < 1 or domains > length:
@@ -140,9 +176,10 @@ class Transform(Descriptor):
                                 flatten: bool, **kwargs):
         """Calculate auto-cross covariances values.
 
-        :param sequence : protein sequence
+        :param sequence : Protein sequence
         :param lag: Lag between amino acids
-        :param flatten: Whether to give global average or average per dimension
+        :param flatten: Should dimensions not be returned separately
+        :param kwargs: keyword arguments passed to the get method of the underlying descriptor
         """
         length = (len(sequence) - 1
                   if self.Descriptor.Type == 'Distance'
@@ -167,16 +204,16 @@ class Transform(Descriptor):
                                   (length-lag))
         acc = np.round(acc, 6)
         if flatten:
-            return acc.flatten(order='F').tolist()
+            return acc.flatten(order='C').tolist()
         return acc.tolist()
 
-
-    def __physicochem_distance_tansform__(self, sequence: str, lag: int, **kwargs):
+    def __physicochem_distance_transform__(self, sequence: str, lag: int, **kwargs):
         """Calculate physicochemical distance transform values.
 
         Gaps will automatically be omitted.
-        :param sequence : protein sequence
-        :param lag: lag between amino acids
+        :param sequence : Protein sequence
+        :param lag: Lag between amino acids
+        :param kwargs: keyword arguments passed to the get method of the underlying descriptor
         """
         length = (len(sequence) - 1
                   if self.Descriptor.Type == 'Distance'
