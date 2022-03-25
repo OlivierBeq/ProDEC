@@ -12,6 +12,7 @@ from typing import Callable, List, Optional, Type, Union
 
 import numpy as np
 from psutil import virtual_memory
+from tqdm.auto import tqdm
 
 
 std_amino_acids = list('ACDEFGHIKLMNPQRSTVWY')
@@ -180,7 +181,7 @@ def enough_avail_memory(array_size: int, dtype: Type, margin: float=0.1) -> bool
 
 
 class DescriptorPool:
-    """Multiprofcessing class to calculate descriptors and transforms."""
+    """Multiprocessing class to calculate descriptors and transforms."""
     def __init__(self, calc,
                  nproc: int, **kwargs):
         """Instantiate a DescriptorPool.
@@ -285,14 +286,14 @@ def _multiprocess_get(descriptor,  # a Descriptor or Transform object
         ids = list(map(str, range(len(sequences))))
     elif len(ids) != len(sequences):
         raise ValueError('sequences and ids must have same length.')
+    elif len(set(ids)) != len(ids):
+        raise ValueError('non unique ids.')
     if not isinstance(nproc, int) or nproc < 1:
         nproc = cpu_count()
     if ipynb:
-        import tqdm.notebook
-        pbar = tqdm.notebook.tqdm(total=len(sequences), disable=quiet)
+        pbar = tqdm(total=len(sequences), disable=quiet)
     else:
-        import tqdm
-        pbar = tqdm.tqdm(total=len(sequences), disable=quiet)
+        pbar = tqdm(total=len(sequences), disable=quiet)
     try:
         with DescriptorPool(descriptor, nproc, **kwargs) as pool:
             for seq, res in pool.map(sequences, ids):
