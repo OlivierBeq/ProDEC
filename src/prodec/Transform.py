@@ -19,6 +19,7 @@ class TransformType(Enum):
     AVG = 0
     ACC = 1
     PDT = 2
+    FFT = 3
 
     def __repr__(self):
         """Create the transform type representation."""
@@ -29,6 +30,7 @@ class TransformType(Enum):
         transforms = [{'Fullname': 'Domain average', 'Constant Length': True, 'Binary': False},
                       {'Fullname': 'Auto-cross covariances', 'Constant Length': True, 'Binary': False},
                       {'Fullname': 'Physicochemical Distance Tranformation', 'Constant Length': True, 'Binary': False},
+                      {'Fullname': 'Fast Fourier Transform', 'Constant Length': False, 'Binary': False}
                       ]
         return transforms[self.value]
 
@@ -96,13 +98,14 @@ class Transform:
         return descriptor.Binary == transform.data['Binary'] or transform.data['Binary'] == 'All'
 
     def get(self, sequence: str, flatten: bool = True, lag: int = 1,
-            domains: int = 2, **kwargs):
+            domains: int = 2, normalize: bool = True, **kwargs):
         """Transform raw protein descriptor values.
 
         :param sequence : Protein sequence
         :param flatten  : Should dimensions not be returned separately (only for AVG and ACC)
         :param lag      : Lag between amino acids (only for ACC and PDT)
         :param domains  : Number of domains to split the sequence into (only for AVG)
+        :param normalize: Should FFT amplitudes be normalized
         :param kwargs: keyword arguments passed to the get method of the underlying descriptor
         """
         if not Transform.is_compatible(self.Type, self.Descriptor):
@@ -116,6 +119,8 @@ class Transform:
         elif self.Type is TransformType.PDT:
             return self.__physicochem_distance_transform__(sequence, lag,
                                                            **kwargs)
+        elif self.Type is TransformType.FFT:
+            return self.__fast_fourier_transform__(sequence, normalize, flatten, **kwargs)
         else:
             raise NotImplementedError(f'Transform type {self.Type} is not implemented')
 
@@ -250,42 +255,87 @@ class Transform:
         pdt = np.round(pdt, 6)
         return pdt.tolist()
 
+    def __fast_fourier_transform__(self, sequence: str, normalize: bool = True, flatten: bool = True, **kwargs):
+        """
+        Calculate Fast Fourier transform values.
+
+        Code is adapted from Mehdi D. Davari's PyPEF (https://github.com/mdavari/PyPEF)
+        PyPEF—An Integrated Framework for Data-Driven Protein Engineering
+        Niklas E. Siedhoff, Alexander-Maurice Illig, Ulrich Schwaneberg, and Mehdi D. Davari
+        Journal of Chemical Information and Modeling 2021 61 (7), 3463-3476
+        DOI: 10.1021/acs.jcim.1c00099
+
+        :param sequence: sequence to get transformed values of
+        :param kwargs: keyword arguments passed to the get method of descriptor
+        :param normalize: whether amplitudes should be normalized
+        :retun: amplitudes of the Fast Fourier Transform of descriptor values of the sequence
+        """
+        # Get exponent k
+        k = np.log2(len(sequence))
+        # Get raw scores
+        raw = self.Descriptor.get(sequence, flatten=flatten, **kwargs)
+        # Calculate mean to substract from raw values
+        # to avoid artefacts of FFT
+        mean = np.mean(raw, axis=0)
+        raw = np.subtract(raw, mean)
+        # Check if len raw = 2^k with k an integer
+        if math.isclose(int(k), k, rel_tol=1e-8):
+            # Pad with 0s
+            raw_reshaped = np.zeros(pow(2, (int(k) + 1)))  # reshape array
+            for index, value in enumerate(raw):
+                raw_reshaped[index] = value
+            raw = raw_reshaped
+        # Calculate FFT
+        fourier_transformed = np.fft.fft(raw)  # FFT
+        ft_real = np.real(fourier_transformed)
+        ft_imag = np.imag(fourier_transformed)
+        # Get amplitude of frequencies
+        amplitude = ft_real * ft_real + ft_imag * ft_imag
+        if normalize and max(amplitude) != 0:
+            amplitude = np.true_divide(amplitude, max(amplitude))  # normalization of amplitude
+        # Return only the first half of the FFT values:
+        # DFT amplitudes are inherently mirrored passed
+        # half the maximum frequency
+        return amplitude[:math.ceil(len(amplitude) / 2)]
 
     def pandas_get(self, sequences: List[str],
-                   ids: Optional[List[str]]=None,
+                   ids: Optional[List[str]] = None,
                    lag: int = 1,
                    domains: int = 2,
-                   average: bool = True,
-                   nproc: Optional[int]=None,
+                   nproc: Optional[int] = None,
                    quiet=False,
                    ipynb=False, **kwargs) -> pd.DataFrame:
         """Get the raw values of the provided sequences in a pandas DataFrame.
 
-        :param sequences: protein sequences
-        :param gaps     : how should gaps be considered.
-                          Allowed values: 'omit' or 0, ...+inf
-        :param prec     : max number of amino acids to cosider 
-                          before and after the current Calpha
-        :param power    : power the topological distance is raised to
-        :param dtype    : data type for memory efficiency
-        :param fast     : whether to speed up at the cost of intense memory use
+        :param sequences: Protein sequences
+        :param ids      : Unique identifiers of sequences
+        :param lag      : Lag between amino acids
+        :param domains  : Number of domains to split the sequence into
         :param nproc    : number of concurrent processes to run
         :param quiet    : whether to report progress
         :param ipynb    : whether the function is run from a notebook
         """
         if domains > min(map(len, sequences)) or domains < 1:
             raise ValueError(f'Number of domains ({domains}) has to be greater or equal to 1'
-                            ' and lower or equal than the length of the smallest sequence '
-                            f'({min(map(len, sequences))})')
+                             ' and lower or equal than the length of the smallest sequence '
+                             f'({min(map(len, sequences))})')
         if lag >= min(map(len, sequences)) or lag < 1:
             raise ValueError(f'Lag ({lag}) has to be greater or equal to 1 and '
-                              'lower than the length of the smallest sequence '
-                              f'({min(map(len, sequences))})')
-        values = pd.DataFrame(_multiprocess_get(self, sequences=sequences, ids=ids, nproc=nproc, ipynb=ipynb, quiet=quiet,
-                                                lag=lag, domains=domains, average=average))
-        info = f'domains{domains}' if self.Type == "AVG" else f'lag{lag}'
+                             'lower than the length of the smallest sequence '
+                             f'({min(map(len, sequences))})')
+        values = pd.DataFrame(
+            _multiprocess_get(self, sequences=sequences, ids=ids, nproc=nproc, ipynb=ipynb, quiet=quiet,
+                              lag=lag, domains=domains))
+        if self.type is TransformType.AVG:
+            info = f'domains{domains}'
+        elif self.Type is TransformType.ACC or self.Type is TransformType.PDT:
+            info = f'lag{lag}'
+        elif self.Type is TransformType.FFT:
+            info = ''
         if ids:
-            values.columns = ['ID'] + [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in range(1, len(values.columns))]
+            values.columns = ['ID'] + [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in
+                                       range(1, len(values.columns))]
         else:
-            values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in range(1, len(values.columns) + 1)]
+            values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in
+                              range(1, len(values.columns) + 1)]
         return values
