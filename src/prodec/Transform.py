@@ -335,7 +335,7 @@ class Transform:
         values = pd.DataFrame(
             _multiprocess_get(self, sequences=sequences, ids=ids, nproc=nproc, ipynb=ipynb, quiet=quiet,
                               lag=lag, domains=domains))
-        if self.type is TransformType.AVG:
+        if self.Type is TransformType.AVG:
             info = f'domains{domains}'
         elif self.Type is TransformType.ACC or self.Type is TransformType.PDT:
             info = f'lag{lag}'
