@@ -4,9 +4,7 @@ A package to easily calculate descriptors of protein sequences and their common 
 
 ## Installation
 
-    git clone https://gitlab.services.universiteitleiden.nl/cdd/prodec.git  
-    cd prodec/
-    pip install .
+    pip install https://github.com/OlivierBeq/ProDEC/tarball/matser
 
 ## Getting started
 
