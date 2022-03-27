@@ -133,12 +133,20 @@ class Transform:
         :param flatten: Should dimensions not be returned separately
         :param kwargs: keyword arguments passed to the get method of the underlying descriptor
         """
-        length = len(sequence)
+        length = (len(sequence) - 1
+                  if self.Descriptor.Type == 'Distance'
+                  else len(sequence))
         if domains < 1 or domains > length:
-            raise Exception(f'Number of domains ({domains}) '
-                            'has to be greater or equal to 1 '
-                            ' and lower or equal than the length '
-                            f'of the sequence ({length})')
+            if self.Descriptor.Type != 'Distance':
+                raise Exception(f'Number of domains ({domains}) '
+                                'has to be greater or equal to 1 '
+                                ' and lower or equal than the length '
+                                f'of the sequence ({length})')
+            else:
+                raise Exception(f'Number of domains ({domains}) '
+                                'has to be greater or equal to 1 '
+                                ' and lower or equal than the length '
+                                f'of the sequence minus one ({length})')
         # Keep track of original shape if not flat result
         if not flatten:
             raw = np.array(self.Descriptor.get(sequence, flatten=False,
