@@ -304,7 +304,8 @@ class Transform:
         # Return only the first half of the FFT values:
         # DFT amplitudes are inherently mirrored passed
         # half the maximum frequency
-        return amplitude[:math.ceil(len(amplitude) / 2)]
+        amplitude = amplitude[:math.ceil(len(amplitude) / 2)]
+        return np.round(amplitude, decimals=5).tolist()
 
     def pandas_get(self, sequences: List[str],
                    ids: Optional[List[str]] = None,
