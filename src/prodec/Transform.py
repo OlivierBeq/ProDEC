@@ -36,19 +36,19 @@ class TransformType(Enum):
 
     @property
     def fullname(self):
-        return self.data[self.value]['Fullname']
+        return self.data['Fullname']
 
     @property
     def constant_length(self):
-        return self.data[self.value]['Constant Length']
+        return self.data['Constant Length']
 
     @property
     def binary(self):
-        return self.data[self.value]['Binary']
+        return self.data['Binary']
 
     @classmethod
     def available(cls):
-        return list(cls.__members__.values())
+        return list(cls.__members__.keys()) + list(cls.__members__.values())
 
 
 class Transform:
