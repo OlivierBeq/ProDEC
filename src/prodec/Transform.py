@@ -342,9 +342,9 @@ class Transform:
         elif self.Type is TransformType.FFT:
             info = ''
         if ids:
-            values.columns = ['ID'] + [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in
+            values.columns = ['ID'] + [f'{self.Type.name}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in
                                        range(1, len(values.columns))]
         else:
-            values.columns = [f'{self.Type}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in
+            values.columns = [f'{self.Type.name}_{info}_{self.Descriptor.ID.replace(" ", "-")}_{x}' for x in
                               range(1, len(values.columns) + 1)]
         return values
