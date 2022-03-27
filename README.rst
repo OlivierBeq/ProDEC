@@ -9,9 +9,7 @@ If you want to install this package, execute the following lines in your termina
 
 .. code-block:: sh
 
-    $ git clone https://gitlab.services.universiteitleiden.nl/cdd/prodec.git  
-    $ cd prodec/
-    $ pip install .
+    $ pip install https://github.com/OlivierBeq/ProDEC/tarball/master
 
 
 Build documentation with the following commands:
