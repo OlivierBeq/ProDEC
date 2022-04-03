@@ -6,6 +6,7 @@ A package to easily calculate descriptors of protein sequences and their common 
 
     pip install https://github.com/OlivierBeq/ProDEC/tarball/master
 
+
 ## Getting started
 
 ProDEC is organised in three classes:
