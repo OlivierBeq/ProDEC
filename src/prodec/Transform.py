@@ -74,7 +74,7 @@ class Transform:
     @staticmethod
     def available_transforms():
         """Get possible transforms for all descriptors."""
-        return [x.data for x in TransformType.available()]
+        return [x for x in TransformType.available()]
 
     @property
     def summary(self):
