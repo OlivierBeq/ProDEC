@@ -116,7 +116,7 @@ To turn the optimization off and get full precision:
 
  - ***Compatibility***
 
-Some transforms cannot be calculated for binary descriptors. Som others can only be calculated with binary descriptors. One can check for compatibility between a transform and a descriptor.
+Some transforms cannot be calculated for binary descriptors. Some others can only be calculated with binary descriptors. One can check for compatibility between a transform and a descriptor.
 
     psm = pdescs.get_descriptor('PSM')
     prodec.Transform.is_compatible('AVG', 'PSM')
