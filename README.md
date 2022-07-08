@@ -10,8 +10,8 @@ A package to easily calculate descriptors of protein sequences and their common 
 ## Getting started
 
 ProDEC is organised in three classes:
- 1. **ProteinDescripors** - loads all available descriptors and allows you to instanciate them
- 2. **Descriptor** - instanciated from the latter, allows retrieval of raw descriptor values
+ 1. **ProteinDescripors** - loads all available descriptors and allows you to instantiate them
+ 2. **Descriptor** - instantiated from the latter, allows retrieval of raw descriptor values
  3. **Transform** - to calculate domain averages, auto-cross covariances (ACC), physicochemical distance transformations (PDT) and fast Fourier transform (FFT)
  4. **TransformType** - to identify the transform to be performed
 
@@ -46,7 +46,7 @@ Now, obtain such descriptor values for the protein sequence.
 To transform raw values, first identify available transforms (static method).
 
     print(Transform.available_transforms())
-Let us instanciate the desired transform (here domain averages)
+Let us instantiate the desired transform (here domain averages)
 
     avg_zscale = Transform(TransformType.AVG, zscales)
 and obtain 50 domain averages (defaults to 2 if not specified).
@@ -132,7 +132,7 @@ All arguments a *Descriptor* accepts can be supplied to a transform's *get* meth
 
 ### Adding new descriptors
 Supplied descriptors are described in the file named *data.json* under the *src* folder.
-The list of available descriptors is loaded from the *data.json* file when **ProteinDescriptors** is instanciated.
+The list of available descriptors is loaded from the *data.json* file when **ProteinDescriptors** is instantiated.
 Add your favorite descriptor to the list, respecting the format of the file and giving it a unique ID, for it to be available.
 
 ### Checking descriptor for amino acids support

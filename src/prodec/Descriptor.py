@@ -22,7 +22,7 @@ class Descriptor:
     """A class used for calculating protein descriptors."""
 
     def __init__(self, desc_data: dict):
-        """Instanciate a Descriptor.
+        """Instantiate a Descriptor.
 
         :param desc_data: Descriptor data
         """

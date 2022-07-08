@@ -14,7 +14,7 @@ class ProteinDescriptors:
     """A class used for caching available protein descripors."""
 
     def __init__(self, json: str = None):
-        """Instanciate a new ProteinDesciptors.
+        """Instantiate a new ProteinDesciptors.
 
         :param json: Path to json file or file handle describing descriptors
         """
