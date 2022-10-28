@@ -4,6 +4,7 @@
 
 import math
 from enum import Enum, unique
+from itertools import chain
 from typing import List, Optional, Union
 
 import numpy as np
@@ -122,7 +123,10 @@ class Transform:
             return self.__physicochem_distance_transform__(sequence, lag,
                                                            **kwargs)
         elif self.Type is TransformType.FFT:
-            return self.__fast_fourier_transform__(sequence, normalize, flatten, **kwargs)
+            try:
+                return self.__fast_fourier_transform__(sequence, normalize, flatten, **kwargs)
+            except Exception as e:
+                raise RuntimeException('something occured') from e
         else:
             raise NotImplementedError(f'Transform type {self.Type} is not implemented')
 
@@ -283,31 +287,37 @@ class Transform:
         # Get exponent k
         k = np.log2(len(sequence))
         # Get raw scores
-        raw = self.Descriptor.get(sequence, flatten=flatten, **kwargs)
-        # Calculate mean to substract from raw values
-        # to avoid artefacts of FFT
-        mean = np.mean(raw, axis=0)
-        raw = np.subtract(raw, mean)
-        # Check if len raw = 2^k with k an integer
-        if math.isclose(int(k), k, rel_tol=1e-8):
-            # Pad with 0s
-            raw_reshaped = np.zeros(pow(2, (int(k) + 1)))  # reshape array
-            for index, value in enumerate(raw):
-                raw_reshaped[index] = value
-            raw = raw_reshaped
-        # Calculate FFT
-        fourier_transformed = np.fft.fft(raw)  # FFT
-        ft_real = np.real(fourier_transformed)
-        ft_imag = np.imag(fourier_transformed)
-        # Get amplitude of frequencies
-        amplitude = ft_real * ft_real + ft_imag * ft_imag
-        if normalize and max(amplitude) != 0:
-            amplitude = np.true_divide(amplitude, max(amplitude))  # normalization of amplitude
-        # Return only the first half of the FFT values:
-        # DFT amplitudes are inherently mirrored passed
-        # half the maximum frequency
-        amplitude = amplitude[:math.ceil(len(amplitude) / 2)]
-        return np.round(amplitude, 6).tolist()
+        raw = np.array(self.Descriptor.get(sequence, flatten=False, **kwargs))
+        # Obtain tranformed values
+        result = []
+        for dim in range(raw.shape[1]):
+            # Calculate mean to substract from raw values
+            # to avoid artefacts of FFT
+            mean = np.mean(raw[:, dim], axis=0)
+            centered = np.subtract(raw[:, dim], mean)
+            # Check if len raw = 2^k with k an integer
+            if math.isclose(int(k), k, rel_tol=1e-8):
+                # Pad with 0s
+                reshaped = np.zeros(pow(2, (int(k) + 1)))  # reshape array
+                for index, value in enumerate(centered):
+                    reshaped[index] = value
+                centered = reshaped
+            # Calculate FFT
+            fourier_transformed = np.fft.fft(centered)  # FFT
+            ft_real = np.real(fourier_transformed)
+            ft_imag = np.imag(fourier_transformed)
+            # Get amplitude of frequencies
+            amplitude = ft_real * ft_real + ft_imag * ft_imag
+            if normalize and max(amplitude) != 0:
+                amplitude = np.true_divide(amplitude, max(amplitude))  # normalization of amplitude
+            # Return only the first half of the FFT values:
+            # DFT amplitudes are inherently mirrored passed
+            # half the maximum frequency
+            amplitude = amplitude[:math.ceil(len(amplitude) / 2)]
+            result.append(np.round(amplitude, 6).tolist())
+        if flatten:
+            return list(chain.from_iterable(result))
+        return result
 
     def pandas_get(self, sequences: List[str],
                    ids: Optional[List[str]] = None,
