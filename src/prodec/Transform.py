@@ -60,6 +60,8 @@ class Transform:
         :param type: Type of Transform
         :param descriptor: Descriptor to be transformed
         """
+        if not isinstance(descriptor, Descriptor):
+            raise ValueError('descriptor must br a valid ProDEC descriptor instance')
         if not isinstance(type, (str, TransformType)):
             raise ValueError('transform type must be either a str or a TransformType')
         if isinstance(type, str):
