@@ -303,7 +303,8 @@ def _multiprocess_get(descriptor,  # a Descriptor or Transform object
                     yield res
                 if not quiet:
                     pbar.update()
-    except Exception as _:
+    except Exception as e:
         pbar.close()
+        raise RuntimeError('An error occured during descriptor calculation') from e
     else:
         pbar.close()
