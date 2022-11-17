@@ -96,7 +96,7 @@ class Transform:
         if transform not in TransformType.available():
             raise ValueError(f'Transform type {transform} is not implemented')
         if isinstance(transform, str):
-            return descriptor.Binary == TransformType[transform]['Binary'] or TransformType[transform][
+            return descriptor.Binary == TransformType[transform].data['Binary'] or TransformType[transform].data[
                 'Binary'] == 'All'
         return descriptor.Binary == transform.data['Binary'] or transform.data['Binary'] == 'All'
 
