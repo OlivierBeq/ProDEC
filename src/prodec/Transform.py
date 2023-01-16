@@ -252,8 +252,6 @@ class Transform:
         mean_score = np.average(std_scores, axis=0)
         mean_difference = np.sqrt(np.sum(np.power(std_scores - mean_score, 2),
                                          axis=0))
-        # Removing gaps
-        sequence = ''.join(filter(str.isalpha, sequence))
         # Adjust raw values
         raw = np.array(self.Descriptor.get(sequence, flatten=False, **kwargs))
         raw = (raw - mean_score) / mean_difference
