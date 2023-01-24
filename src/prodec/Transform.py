@@ -126,7 +126,7 @@ class Transform:
             try:
                 return self.__fast_fourier_transform__(sequence, normalize, flatten, **kwargs)
             except Exception as e:
-                raise RuntimeException('something occured') from e
+                raise RuntimeError('something occured') from e
         else:
             raise NotImplementedError(f'Transform type {self.Type} is not implemented')
 

@@ -98,7 +98,6 @@ def raychaudhury_speed(sequence: str,
     This implementation is fast but requires a lot of memory.
     :param sequence : protein sequence
     :param mapping  : function mapping amino acid to scale value
-    :param distance : distance between alpha carbons
     :param power    : power scaling of distance matrix
     :param dtype    : value type for memory efficiency
     """
@@ -126,7 +125,6 @@ def raychaudhury_memory(sequence: str,
     This implementation uses little memory but is slow.
     :param sequence : protein sequence
     :param mapping  : function mapping amino acid to scale value
-    :param distance : distance between alpha carbons
     :param power    : power scaling of distance matrix
     :param dtype    : value type for memory efficiency
     """
@@ -145,7 +143,7 @@ def raychaudhury_memory(sequence: str,
 
 
 def get_values(scale_values: dict):
-    """Get recursively the inner most values from a recursive dict."""
+    """Get recursively the inner-most values from a recursive dict."""
     values = []
     for key in scale_values.keys():
         if isinstance(scale_values[key], dict):
@@ -157,7 +155,7 @@ def get_values(scale_values: dict):
     return values
 
 
-def enough_avail_memory(array_size: int, dtype: Type, margin: float=0.1) -> bool:
+def enough_avail_memory(array_size: int, dtype: Type, margin: float = 0.1) -> bool:
     """Check if enough memory is available.
 
     This is to use fast in memory computation of distance edge vectors.
@@ -175,9 +173,8 @@ def enough_avail_memory(array_size: int, dtype: Type, margin: float=0.1) -> bool
         return f(array_size) * (1 + margin) < avail_ram
     if obj_size <= 28:
         return g(array_size) * (1 + margin) < avail_ram
-    else: # usually with obj_size >= 32:
+    else:  # usually with obj_size >= 32:
         return h(array_size) * (1 + margin) < avail_ram
-    return False
 
 
 class DescriptorPool:
@@ -209,7 +206,7 @@ class DescriptorPool:
         """Distribute calculation for sequences to a PoolIterator.
         
         :param seqs: protein sequences
-        :pram ids: identifiers of protein sequences
+        :param ids: identifiers of protein sequences
         """
         return PoolIterator(self, seqs, ids, self.nproc * 2 + 10)
 
@@ -223,7 +220,7 @@ class DescriptorPool:
 
 class PoolIterator:
     """Multiprocessing iterator to be used with DescriptorPool"""
-    def __init__(self, pool: DescriptorPool, seqs: List[str], ids:List[str], buf: int):
+    def __init__(self, pool: DescriptorPool, seqs: List[str], ids: List[str], buf: int):
         """Instantiate a PoolIterator.
         
         :param pool: the DescriptorPool to submit calculations to
@@ -268,10 +265,10 @@ class PoolIterator:
 
 def _multiprocess_get(descriptor,  # a Descriptor or Transform object
                       sequences: List[str],
-                      ids: Optional[List[str]]=None,
-                      nproc: int=1,
-                      ipynb: bool=False,
-                      quiet:bool=False, **kwargs):
+                      ids: Optional[List[str]] = None,
+                      nproc: int = 1,
+                      ipynb: bool = False,
+                      quiet: bool = False, **kwargs):
     """Calculate protein descriptors or transforms and return a pandas dataframe.
     
     :param descriptor: prodec.Descriptor or prodec.Transform

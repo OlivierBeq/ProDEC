@@ -67,8 +67,8 @@ class Descriptor:
                 return False
         return True
 
-    def get(self, sequence: str, flatten: bool=True, gaps: Union[int, str]=0,
-            prec: Optional[int]=60, power: int=-4, dtype: Type=np.float16, fast: bool=False,
+    def get(self, sequence: str, flatten: bool = True, gaps: Union[int, str] = 0,
+            prec: Optional[int] = 60, power: int = -4, dtype: Type = np.float16, fast: bool = False,
             **kwargs):
         """Get the raw values of the provided sequence.
 
@@ -149,10 +149,10 @@ class Descriptor:
                         if not enough_ram:
                             warnings.warn('Not enough memory available, reverting to slow calculation.')
                         values = alpha_carbon_distance_edge_vector_memory(sequence,
-                                                                    mapping,
-                                                                    1, power,
-                                                                    dtype,
-                                                                    prec, 1)
+                                                                          mapping,
+                                                                          1, power,
+                                                                          dtype,
+                                                                          prec, 1)
         if isinstance(values, list):
             return values
         if not flatten:
@@ -161,15 +161,15 @@ class Descriptor:
             return values.flatten(order='C').tolist()
 
     def pandas_get(self, sequences: List[str],
-                   ids: Optional[List[str]]=None,
-                   gaps: Union[int, str]=0,
-                   prec: Optional[int]=60,
-                   power: int=-4,
-                   dtype: Type=np.float16,
-                   fast: bool=False,
-                   nproc: Optional[int]=None,
-                   quiet=False,
-                   ipynb=False, **kwargs) -> pd.DataFrame:
+                   ids: Optional[List[str]] = None,
+                   gaps: Union[int, str] = 0,
+                   prec: Optional[int] = 60,
+                   power: int = -4,
+                   dtype: Type = np.float16,
+                   fast: bool = False,
+                   nproc: Optional[int] = None,
+                   quiet = False,
+                   ipynb = False, **kwargs) -> pd.DataFrame:
         """Get the raw values of the provided sequences in a pandas DataFrame.
 
         :param sequences: protein sequences
@@ -184,9 +184,9 @@ class Descriptor:
         :param quiet    : whether to report progress
         :param ipynb    : whether the function is run from a notebook
         """
-        values = pd.DataFrame(_multiprocess_get(self, sequences=sequences, ids=ids, nproc=nproc, ipynb=ipynb, quiet=quiet,
-                                                gaps=gaps, prec=prec, power=power,
-                                                fast=fast, dtype=dtype))
+        values = pd.DataFrame(_multiprocess_get(self, sequences=sequences, ids=ids, nproc=nproc, ipynb=ipynb,
+                                                quiet=quiet, gaps=gaps, prec=prec, power=power, fast=fast,
+                                                dtype=dtype))
         if ids:
             values.columns = ['ID'] + [f'{self.ID.split()[0]}_{x}' for x in range(1, len(values.columns))]
         else:

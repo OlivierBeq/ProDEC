@@ -57,7 +57,7 @@ One can get information about the transform.
 
     print(avg_zscale.summary)
 
-Similarly, ACC, PDT and FFT can be obtain with
+Similarly, ACC, PDT and FFT can be obtained with
 
     acc_zscale = Transform(TransformType.ACC, zscales)
     # or Transform('ACC', zscales)

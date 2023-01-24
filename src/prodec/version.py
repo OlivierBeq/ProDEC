@@ -2,4 +2,4 @@
 
 """Versioning information."""
 
-VERSION = '1.0.2post4'
+VERSION = '1.0.2post5'

@@ -12,12 +12,14 @@ from os import path
 import prodec
 from tests.constants import *
 
+
 class TestFileExists(unittest.TestCase):
     """Tests for the presence of minimal data."""
 
     def test_data(self):
         """Test default ProteinDescriptor data is present."""
         self.assertTrue(path.isfile(DFLT_DATA))
+
 
 class TestProteinDescriptors(unittest.TestCase):
     """Tests for ProteinDescriptors."""
@@ -89,8 +91,8 @@ class TestProteinDescriptors(unittest.TestCase):
             self.assertEqual(len(str(desc.Info['Year'])), 4)
             self.assertIsInstance(desc.Info['Year'], Number)
             # Either Journal or Patent and if journal, eihter DOI or PMID
-            self.assertTrue((desc.Info['Journal'] is not None and \
-                             (desc.Info['DOI'] is not None or \
+            self.assertTrue((desc.Info['Journal'] is not None and
+                             (desc.Info['DOI'] is not None or
                               desc.Info['PMID'] is not None)
-                            ) or desc.Info['Patent'] is not None)
+                             ) or desc.Info['Patent'] is not None)
 
