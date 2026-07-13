@@ -6,25 +6,24 @@ import functools
 import sys
 from collections import deque
 from itertools import islice
-from numbers import Number
-from multiprocessing import cpu_count, Manager, Pool
-from typing import Callable, List, Optional, Type, Union
+from multiprocessing import Manager, Pool, cpu_count
+from multiprocessing.pool import AsyncResult
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 import numpy as np
 from psutil import virtual_memory
 from tqdm.auto import tqdm
 
-
 std_amino_acids = list('ACDEFGHIKLMNPQRSTVWY')
 
 
 def alpha_carbon_distance_edge_vector_speed(sequence: str,
-                                            mapping: Callable[[str], Number],
-                                            distance: Number = 1,
-                                            power: Number = -4,
+                                            mapping: Callable[[str], Union[int, float]],
+                                            distance: Union[int, float] = 1,
+                                            power: Union[int, float] = -4,
                                             dtype: Type = np.half,
                                             window: int = 60,
-                                            offset: int = 1) -> List[Number]:
+                                            offset: int = 1) -> np.ndarray:
     """Calculate alphaCarbon distance-normalized edge vector.
 
     This implementation is fast but requires a lot of memory.
@@ -57,12 +56,12 @@ def alpha_carbon_distance_edge_vector_speed(sequence: str,
 
 
 def alpha_carbon_distance_edge_vector_memory(sequence: str,
-                                             mapping: Callable[[str], Number],
-                                             distance: Number = 1,
-                                             power: Number = -4,
+                                             mapping: Callable[[str], Union[int, float]],
+                                             distance: Union[int, float] = 1,
+                                             power: Union[int, float] = -4,
                                              dtype: Type = np.half,
                                              window: int = 60,
-                                             offset: int = 1) -> List[Number]:
+                                             offset: int = 1) -> np.ndarray:
     """Calculate alphaCarbon distance-normalized edge vector.
 
     This implementation uses little memory but is slow.
@@ -90,9 +89,9 @@ def alpha_carbon_distance_edge_vector_memory(sequence: str,
 
 
 def raychaudhury_speed(sequence: str,
-                       mapping: Callable[[str], Number],
+                       mapping: Callable[[str], Union[int, float]],
                        power: int,
-                       dtype: Type = np.half) -> List[Number]:
+                       dtype: Type = np.half) -> np.ndarray:
     """Calculate Raychaudhury's distance-normalized edge vector.
 
     This implementation is fast but requires a lot of memory.
@@ -117,9 +116,9 @@ def raychaudhury_speed(sequence: str,
 
 
 def raychaudhury_memory(sequence: str,
-                        mapping: Callable[[str], Number],
+                        mapping: Callable[[str], Union[int, float]],
                         power: int,
-                        dtype: Type = np.half) -> List[Number]:
+                        dtype: Type = np.half) -> np.ndarray:
     """Calculate Raychaudhury's distance-normalized edge vector.
 
     This implementation uses little memory but is slow.
@@ -142,9 +141,9 @@ def raychaudhury_memory(sequence: str,
     return values
 
 
-def get_values(scale_values: dict):
+def get_values(scale_values: Dict[str, Any]) -> List[Any]:
     """Get recursively the inner-most values from a recursive dict."""
-    values = []
+    values: List[Any] = []
     for key in scale_values.keys():
         if isinstance(scale_values[key], dict):
             values.extend(get_values(scale_values[key]))
@@ -179,10 +178,10 @@ def enough_avail_memory(array_size: int, dtype: Type, margin: float = 0.1) -> bo
 
 class DescriptorPool:
     """Multiprocessing class to calculate descriptors and transforms."""
-    def __init__(self, calc,
-                 nproc: int, **kwargs):
+    def __init__(self, calc: Any,
+                 nproc: int, **kwargs: Any) -> None:
         """Instantiate a DescriptorPool.
-        
+
         :param calc: a prodec.Descriptor or prodec.Transform object
         :param nproc: number of concurrent processes
         :param kwargs: any prodec.Descriptor or prodec.Transform parameter
@@ -192,25 +191,25 @@ class DescriptorPool:
         self.calc = functools.partial(calc.get, **kwargs)
         self.nproc = nproc
 
-    def __enter__(self):
+    def __enter__(self) -> 'DescriptorPool':
         """Start iteration."""
         self.mgr.__enter__()
         return self
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
         """Terminate iteration."""
         self.pool.terminate()
         self.mgr.__exit__(*args, **kwargs)
 
-    def map(self, seqs, ids):
+    def map(self, seqs: List[str], ids: List[str]) -> 'PoolIterator':
         """Distribute calculation for sequences to a PoolIterator.
-        
+
         :param seqs: protein sequences
         :param ids: identifiers of protein sequences
         """
         return PoolIterator(self, seqs, ids, self.nproc * 2 + 10)
 
-    def submit(self, seq):
+    def submit(self, seq: str) -> AsyncResult:
         """Submit calculation to the internal Pool.
 
         :param seq: protein sequence
@@ -220,33 +219,33 @@ class DescriptorPool:
 
 class PoolIterator:
     """Multiprocessing iterator to be used with DescriptorPool"""
-    def __init__(self, pool: DescriptorPool, seqs: List[str], ids: List[str], buf: int):
+    def __init__(self, pool: DescriptorPool, seqs: List[str], ids: List[str], buf: int) -> None:
         """Instantiate a PoolIterator.
-        
+
         :param pool: the DescriptorPool to submit calculations to
         :param seqs: list of protein sequences
         :param buf: buffer of sequences per process
         """
         self.pool = pool
-        self.futures = deque()
-        self.seqs = zip(ids, seqs)
+        self.futures: deque = deque()
+        self.seqs = zip(ids, seqs, strict=True)
 
         for id, seq in islice(self.seqs, buf):
             self.submit(id, seq)
 
-    def submit(self, id, seq):
+    def submit(self, id: str, seq: str) -> None:
         """Add sequence id and future to internal futures.
-        
+
         :param id: ID of the sequence
         :param seq: protein sequence
         """
         self.futures.append((id, self.pool.submit(seq)))
 
-    def __iter__(self):
+    def __iter__(self) -> 'PoolIterator':
         """Iterate to create a container."""
         return self
 
-    def __next__(self):
+    def __next__(self) -> Tuple[str, Any]:
         """Submit job and return."""
         try:
             id, seq = next(self.seqs)
@@ -258,19 +257,19 @@ class PoolIterator:
             id, fut = self.futures.popleft()
             return id, fut.get()
         except IndexError:
-            raise StopIteration
+            raise StopIteration from None
 
     next = __next__
 
 
-def _multiprocess_get(descriptor,  # a Descriptor or Transform object
+def _multiprocess_get(descriptor: Any,  # a Descriptor or Transform object
                       sequences: List[str],
                       ids: Optional[List[str]] = None,
-                      nproc: int = 1,
+                      nproc: Optional[int] = 1,
                       ipynb: bool = False,
-                      quiet: bool = False, **kwargs):
+                      quiet: bool = False, **kwargs: Any) -> Iterator[Any]:
     """Calculate protein descriptors or transforms and return a pandas dataframe.
-    
+
     :param descriptor: prodec.Descriptor or prodec.Transform
     :param sequences: protein sequences
     :param ids: identifiers of protein sequences
@@ -279,7 +278,7 @@ def _multiprocess_get(descriptor,  # a Descriptor or Transform object
     :param quiet: whether to show progress or not
     """
     ids_given = ids is not None
-    if not ids_given:
+    if ids is None:
         ids = list(map(str, range(len(sequences))))
     elif len(ids) != len(sequences):
         raise ValueError('sequences and ids must have same length.')

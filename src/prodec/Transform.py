@@ -5,7 +5,7 @@
 import math
 from enum import Enum, unique
 from itertools import chain
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -22,12 +22,12 @@ class TransformType(Enum):
     PDT = 2
     FFT = 3
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Create the transform type representation."""
         return f'<{self.__class__.__name__}.{self.name}>'
 
     @property
-    def data(self):
+    def data(self) -> Dict[str, Any]:
         transforms = [{'Fullname': 'Domain average', 'Constant Length': True, 'Binary': False},
                       {'Fullname': 'Auto-cross covariances', 'Constant Length': True, 'Binary': False},
                       {'Fullname': 'Physicochemical Distance Tranformation', 'Constant Length': True, 'Binary': False},
@@ -36,26 +36,26 @@ class TransformType(Enum):
         return transforms[self.value]
 
     @property
-    def fullname(self):
+    def fullname(self) -> str:
         return self.data['Fullname']
 
     @property
-    def constant_length(self):
+    def constant_length(self) -> bool:
         return self.data['Constant Length']
 
     @property
-    def binary(self):
+    def binary(self) -> Union[bool, str]:
         return self.data['Binary']
 
     @classmethod
-    def available(cls):
+    def available(cls) -> List[Union[str, 'TransformType']]:
         return list(cls.__members__.keys()) + list(cls.__members__.values())
 
 
 class Transform:
     """A class used to process raw values of protein descriptors."""
 
-    def __init__(self, type: Union[str, TransformType], descriptor: Descriptor):
+    def __init__(self, type: Union[str, TransformType], descriptor: Descriptor) -> None:
         """Instantiate a Transform.
 
         :param type: Type of Transform
@@ -75,12 +75,12 @@ class Transform:
         self.Binary = self.Type.binary
 
     @staticmethod
-    def available_transforms():
+    def available_transforms() -> List[Union[str, TransformType]]:
         """Get possible transforms for all descriptors."""
-        return [x for x in TransformType.available()]
+        return list(TransformType.available())
 
     @property
-    def summary(self):
+    def summary(self) -> Dict[str, Any]:
         """Get information on current transform."""
         return self.Type.data
 
@@ -101,7 +101,7 @@ class Transform:
         return descriptor.Binary == transform.data['Binary'] or transform.data['Binary'] == 'All'
 
     def get(self, sequence: str, flatten: bool = True, lag: int = 1,
-            domains: int = 2, normalize: bool = True, **kwargs):
+            domains: int = 2, normalize: bool = True, **kwargs: Any) -> Union[List[Any], List[List[Any]]]:
         """Transform raw protein descriptor values.
 
         :param sequence : Protein sequence
@@ -131,7 +131,7 @@ class Transform:
             raise NotImplementedError(f'Transform type {self.Type} is not implemented')
 
     def __average__(self, sequence: str, domains: int,
-                    flatten: bool, **kwargs):
+                    flatten: bool, **kwargs: Any) -> Union[List[Any], List[List[Any]]]:
         """Calculate domain mean average values.
 
         :param sequence : Protein sequence
@@ -154,6 +154,10 @@ class Transform:
                                 ' and lower or equal than the length '
                                 f'of the sequence minus one ({length})')
         # Keep track of original shape if not flat result
+        # `raw` and `average` genuinely alternate between ndarray and plain
+        # list as this method reshapes/flattens results below.
+        raw: Any
+        average: Any
         if not flatten:
             raw = np.array(self.Descriptor.get(sequence, flatten=False,
                                                **kwargs))
@@ -192,7 +196,7 @@ class Transform:
         return average
 
     def __autocrosscovariance__(self, sequence: str, lag: int,
-                                flatten: bool, **kwargs):
+                                flatten: bool, **kwargs: Any) -> Union[List[Any], List[List[Any]]]:
         """Calculate auto-cross covariances values.
 
         :param sequence : Protein sequence
@@ -214,7 +218,7 @@ class Transform:
                                 f'minus one ({length-1})')
         acc = np.zeros((self.Descriptor.Size, self.Descriptor.Size),
                        dtype=np.float64)
-        raw = self.Descriptor.get(sequence, flatten=True, **kwargs)
+        raw: Any = self.Descriptor.get(sequence, flatten=True, **kwargs)
         for j in range(self.Descriptor.Size):
             for m in range(self.Descriptor.Size):
                 for i in range(length - lag):
@@ -226,7 +230,7 @@ class Transform:
             return acc.flatten(order='C').tolist()
         return acc.tolist()
 
-    def __physicochem_distance_transform__(self, sequence: str, lag: int, **kwargs):
+    def __physicochem_distance_transform__(self, sequence: str, lag: int, **kwargs: Any) -> List[Any]:
         """Calculate physicochemical distance transform values.
 
         Gaps will automatically be omitted.
@@ -267,7 +271,8 @@ class Transform:
         pdt = np.round(pdt, 6)
         return pdt.tolist()
 
-    def __fast_fourier_transform__(self, sequence: str, normalize: bool = True, flatten: bool = True, **kwargs):
+    def __fast_fourier_transform__(self, sequence: str, normalize: bool = True, flatten: bool = True,
+                                   **kwargs: Any) -> Union[List[Any], List[List[Any]]]:
         """
         Calculate Fast Fourier transform values.
 
@@ -322,8 +327,8 @@ class Transform:
                    lag: int = 1,
                    domains: int = 2,
                    nproc: Optional[int] = None,
-                   quiet=False,
-                   ipynb=False, **kwargs) -> pd.DataFrame:
+                   quiet: bool = False,
+                   ipynb: bool = False, **kwargs: Any) -> pd.DataFrame:
         """Get the raw values of the provided sequences in a pandas DataFrame.
 
         :param sequences: Protein sequences

@@ -2,26 +2,27 @@
 
 """Class handling amino acid description in a sequence."""
 
-import itertools
-import multiprocessing
 import warnings
-from typing import Callable, List, Optional, Type, Union
-
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
 
-from .utils import alpha_carbon_distance_edge_vector_memory, \
-                   alpha_carbon_distance_edge_vector_speed, \
-                   enough_avail_memory, get_values, \
-                   raychaudhury_memory, raychaudhury_speed, \
-                   _multiprocess_get
+from .utils import (
+    _multiprocess_get,
+    alpha_carbon_distance_edge_vector_memory,
+    alpha_carbon_distance_edge_vector_speed,
+    enough_avail_memory,
+    get_values,
+    raychaudhury_memory,
+    raychaudhury_speed,
+)
 
 
 class Descriptor:
     """A class used for calculating protein descriptors."""
 
-    def __init__(self, desc_data: dict):
+    def __init__(self, desc_data: Dict[str, Any]) -> None:
         """Instantiate a Descriptor.
 
         :param desc_data: Descriptor data
@@ -48,16 +49,16 @@ class Descriptor:
         self.Binary = set(get_values(self._scales_values)) == {0, 1}
 
     @property
-    def summary(self):
+    def summary(self) -> Dict[str, Any]:
         """Get summary of the descriptor."""
         return self.Info
 
     @property
-    def definition(self):
+    def definition(self) -> Tuple[Any, Any]:
         """Get values defining the descriptor."""
         return self._scales_names, self._scales_values
 
-    def is_sequence_valid(self, sequence: str):
+    def is_sequence_valid(self, sequence: str) -> bool:
         """Check if a sequence can be fully described using the current descriptor.
 
         :param sequence: Protein sequence
@@ -69,7 +70,7 @@ class Descriptor:
 
     def get(self, sequence: str, flatten: bool = True, gaps: Union[int, str] = 0,
             prec: Optional[int] = 60, power: int = -4, dtype: Type = np.float16, fast: bool = False,
-            **kwargs):
+            **kwargs: Any) -> Union[List[Any], List[List[Any]]]:
         """Get the raw values of the provided sequence.
 
         :param sequence : protein sequence
@@ -77,12 +78,13 @@ class Descriptor:
         :param gaps     : how should gaps be considered.
                           Allowed values: 'omit' or 0, ...+inf
         :param dtype    : data type for memory efficiency
-        :param prec     : max number of amino acids to cosider 
+        :param prec     : max number of amino acids to cosider
                           before and after the current Calpha
         :param power    : power the topological distance is raised to
         :param fast     : whether to speed up at the cost of intense memory use
         """
         # Dealing with gaps
+        replacer: Union[int, str]
         if gaps == 'omit':
             sequence = ''.join(filter(str.isalpha, sequence))
             replacer = 0
@@ -106,6 +108,9 @@ class Descriptor:
         if not self.is_sequence_valid(sequence):
             raise Exception('Sequence has unsupported amino acid')
         # Create final array
+        # `values` genuinely holds either an ndarray or a plain list depending
+        # on which branch below computes it.
+        values: Any
         if self.Size > 1:
             dtype_ = int if self.Binary else float
             values = np.zeros((len(sequence), self.Size), dtype=dtype_)
@@ -135,7 +140,7 @@ class Descriptor:
                                                     power, dtype)
                     else:
                         if not enough_ram:
-                            warnings.warn('Not enough memory available, reverting to slow calculation.')
+                            warnings.warn('Not enough memory available, reverting to slow calculation.', stacklevel=2)
                         values = raychaudhury_memory(sequence, mapping, power, dtype)
                 else:
                     if fast and enough_ram:
@@ -147,7 +152,7 @@ class Descriptor:
                                                                  prec, 1)
                     else:
                         if not enough_ram:
-                            warnings.warn('Not enough memory available, reverting to slow calculation.')
+                            warnings.warn('Not enough memory available, reverting to slow calculation.', stacklevel=2)
                         values = alpha_carbon_distance_edge_vector_memory(sequence,
                                                                           mapping,
                                                                           1, power,
@@ -168,14 +173,14 @@ class Descriptor:
                    dtype: Type = np.float16,
                    fast: bool = False,
                    nproc: Optional[int] = None,
-                   quiet = False,
-                   ipynb = False, **kwargs) -> pd.DataFrame:
+                   quiet: bool = False,
+                   ipynb: bool = False, **kwargs: Any) -> pd.DataFrame:
         """Get the raw values of the provided sequences in a pandas DataFrame.
 
         :param sequences: protein sequences
         :param gaps     : how should gaps be considered.
                           Allowed values: 'omit' or 0, ...+inf
-        :param prec     : max number of amino acids to cosider 
+        :param prec     : max number of amino acids to cosider
                           before and after the current Calpha
         :param power    : power the topological distance is raised to
         :param dtype    : data type for memory efficiency
@@ -193,4 +198,3 @@ class Descriptor:
             values.columns = [f'{self.ID.split()[0]}_{x}' for x in range(1, len(values.columns) + 1)]
         return values
 
-                
