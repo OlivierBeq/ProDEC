@@ -4,10 +4,9 @@
 """Tests for ProteinDescriptors."""
 
 import unittest
-from typing import *
 from numbers import Number
-
 from os import path
+from typing import *
 
 import prodec
 from tests.constants import *
@@ -27,41 +26,42 @@ class TestProteinDescriptors(unittest.TestCase):
     def setUp(self) -> None:
         """Load default ProteinDescriptor data"""
         self.pdescs = prodec.ProteinDescriptors()
-        self.default_descs = ["Sneath", "HPI", "Kidera", 
-                              "Zscale Sjöström", "Zscale Hellberg", 
-                              "Zscale Jonsson", "Independent descriptors", 
-                              "Combined descriptors", "GRID tscore", 
-                              "ISA-ECI", "Contact energies", "Zscale Sandberg", 
-                              "Raychaudhury", "MS-WHIM", "E-scale", "VSTV", 
-                              "c-scales", "VHSE", "PSM", "SSIA AM1", 
-                              "GH-scale", "SSIA PM3", "SSIA HF", "SSIA DFT", 
-                              "FASGAI", "Tscale", "VSGETAWAY", "SVRDF", "VTSA", 
-                              "SZOTT", "V-scale", "HSEHPCSV", "VSW", "VHSEH", 
-                              "BLOSUM", "VARIMAX", "HESH", "DPPS", "STscale", 
-                              "CBFQ", "CDFQ", "CUFQ", "ADFQ", "SVEEVA", "SVRG", 
-                              "G-scales", "ProtFP hash", "P-scale", "SVWG", "VSTPV", 
-                              "QCP", "ProtFP PCA", "Zscale binary", "SVMW", "SVHEHS", "SVGER"]
+        self.default_descs = ["Sneath", "HPI", "Kidera",
+                              "Zscale Sjöström", "Zscale Hellberg",
+                              "Zscale Jonsson", "Independent descriptors",
+                              "Combined descriptors", "GRID tscore",
+                              "ISA-ECI", "Contact energies", "Zscale Sandberg",
+                              "Raychaudhury", "MS-WHIM", "E-scale", "VSTV",
+                              "c-scales", "VHSE", "PSM", "SSIA AM1",
+                              "GH-scale", "SSIA PM3", "SSIA HF", "SSIA DFT",
+                              "FASGAI", "Tscale", "VSGETAWAY", "SVRDF", "VTSA",
+                              "SZOTT", "V-scale", "HSEHPCSV", "VSW", "VHSEH",
+                              "BLOSUM", "VARIMAX", "HESH", "DPPS", "STscale",
+                              "CBFQ", "CDFQ", "CUFQ", "ADFQ", "SVEEVA", "SVRG",
+                              "G-scales", "ProtFP hash", "P-scale", "SVWG", "VSTPV",
+                              "QCP", "ProtFP PCA", "Zscale binary", "SVMW", "SVHEHS", "SVGER",
+                              "PhysChem", "Zscale van Westen"]
 
     def test_proteindescriptors_loading_type(self):
         """Test ProteinDescriptors loads default data properly"""
         self.assertIsInstance(self.pdescs.available_descriptors, List)
-    
+
     def test_proteindescriptors_loading_size(self):
         self.assertGreater(len(self.pdescs.available_descriptors), 0)
-    
+
     def test_proteindescriptors_loading_value(self):
         self.assertListEqual(sorted(self.pdescs.available_descriptors), sorted(self.default_descs))
-    
+
     def test_proteindescriptors_descriptor(self):
         for desc in self.default_descs:
             self.assertEqual(desc, self.pdescs.get_descriptor(desc).ID)
 
     def test_proteindescriptors_scales(self):
-        """Test descriptor sizes are loaded properly""" 
+        """Test descriptor sizes are loaded properly"""
         for desc in self.pdescs.available_descriptors:
             desc = self.pdescs.get_descriptor(desc)
             dtype = desc.Type
-            values = desc.Scales_values
+            values = desc.definition[1]
             self.assertIsInstance(values, dict)
             self.assertEqual(len(values.keys()), 20)
             if dtype == 'Linear':
@@ -81,7 +81,7 @@ class TestProteinDescriptors(unittest.TestCase):
                 for key, value in values.items():
                     self.assertIn(key, DFLT_AA)
                     self.assertIsInstance(value, Number)
-    
+
     def test_proteindescriptors_info(self):
         """Test if info is correctly given for descriptor"""
         for desc in self.pdescs.available_descriptors:

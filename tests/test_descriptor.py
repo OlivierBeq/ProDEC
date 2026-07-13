@@ -14,7 +14,7 @@ from tests.constants import *
 
 class TestDescriptor(unittest.TestCase):
     """Tests for Descriptor."""
-    
+
     def setUp(self):
         """Create custom descriptor for testing"""
         # Values below obtained at random
@@ -48,13 +48,13 @@ class TestDescriptor(unittest.TestCase):
                                              'PMID': None, 'Patent': None})
 
     def test_descriptor_loaded_Scales_Names_type(self):
-        self.assertIsInstance(self.desc.Scales_names, list)
+        self.assertIsInstance(self.desc.definition[0], list)
 
     def test_descriptor_loaded_Scales_Names(self):
-        self.assertListEqual(self.desc.Scales_names, ['v1', 'v2', 'v3'])
+        self.assertListEqual(self.desc.definition[0], ['v1', 'v2', 'v3'])
 
     def test_descriptor_definition(self):
-        self.assertEqual(self.desc.definition, self.replacements)
+        self.assertEqual(self.desc.definition[1], self.replacements)
 
     def test_descriptor_is_sequence_valid_default(self):
         self.assertTrue(self.desc.is_sequence_valid(DFLT_SEQ))
@@ -77,19 +77,19 @@ class TestDescriptor(unittest.TestCase):
     def test_descriptor_get_not_flattened_size(self):
         result = np.array(self.desc.get(DFLT_SEQ, False, 0)).shape
         self.assertTrue(result[0] == len(DFLT_SEQ) and result[1] == 3)
-    
+
     def test_descriptor_get_flattened_value(self):
         result = self.desc.get(DFLT_SEQ, True, 0)
         self.assertAlmostEqual(np.mean(result), -9.968835, 6)
         self.assertAlmostEqual(np.sum(result), -598.1301, 4)
         self.assertAlmostEqual(np.std(result), 56.753686, 6)
-    
+
     def test_descriptor_get_not_flattened_value(self):
         result = self.desc.get(DFLT_SEQ, True, 0)
         self.assertAlmostEqual(np.mean(result), -9.968835, 6)
         self.assertAlmostEqual(np.sum(result), -598.1301, 4)
         self.assertAlmostEqual(np.std(result), 56.753686, 6)
-    
+
     def test_descriptor_get_empty_value(self):
         result = self.desc.get('', True, 0)
         self.assertListEqual(result, [])
