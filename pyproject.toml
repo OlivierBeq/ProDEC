@@ -1,6 +1,123 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
-]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "prodec"
+description = "A package to calculate protein sequence descriptors"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Olivier J. M. Béquignon", email = "olivier.bequignon.maintainer@gmail.com" },
+]
+maintainers = [
+    { name = "Olivier J. M. Béquignon", email = "olivier.bequignon.maintainer@gmail.com" },
+]
+requires-python = ">=3.11"
+keywords = [
+    "protein",
+    "descriptors",
+    "proteochemometrics",
+    "PCM",
+    "QSAR",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "orjson",
+    "numpy",
+    "pandas",
+    "psutil",
+    "tqdm",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+testing = [
+    "pytest",
+    "pytest-cov",
+]
+lint = [
+    "ruff",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://github.com/OlivierBeq/ProDEC"
+Repository = "https://github.com/OlivierBeq/ProDEC"
+Documentation = "https://github.com/OlivierBeq/ProDEC/tree/master/docs"
+"Bug Tracker" = "https://github.com/OlivierBeq/ProDEC/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "prodec.version.VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+prodec = ["*.json", "py.typed"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [
+    ".tox",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    ".cache",
+    ".eggs",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "W",   # pycodestyle
+    "F",   # pyflakes
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "T20", # flake8-print
+    "N",   # pep8-naming
+    "I",   # isort
+]
+ignore = [
+    "N999", # module names mirror public class names (Descriptor.py, Transform.py, ...); kept for API stability
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "F403", # `from tests.constants import *` is the existing test fixture pattern
+    "F405", # names are defined by the star import above
+    "N802", # test names mirror the JSON field casing they check (e.g. test_..._ID)
+]
+
+[tool.mypy]
+# Deliberately no python_version pin: CI runs mypy under each supported
+# interpreter (3.11-3.13) and letting mypy match the running interpreter
+# avoids choking on newer third-party stubs (e.g. numpy's PEP 695 syntax)
+# when checked against an older pinned target.
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["prodec"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+]
